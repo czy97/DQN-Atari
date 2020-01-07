@@ -3,3 +3,6 @@
 dqn/__pycache__/
 # Videos
 video/
+video_history/
+papers/
+results/
