@@ -22,7 +22,7 @@ if __name__ == '__main__':
                         help='the dir to store log and model')
     parser.add_argument('--learning-rate', type=float, default=1e-4,
                         help='learning rate')
-    parser.add_argument('--num-steps', type=int, default=100000,
+    parser.add_argument('--num-steps', type=int, default=1000000,
                         help='steps to train')
     parser.add_argument('--batch-size', type=int, default=32,
                         help='number of transitions to optimize at the same time')
