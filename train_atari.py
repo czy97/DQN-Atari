@@ -29,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--print-freq', type=int, default=10,
                         help='print frequency')
     parser.add_argument('--monitor', action='store_true',default=False)
+    parser.add_argument('--play', action='store_true', default=False)
 
 
 
@@ -112,45 +113,58 @@ if __name__ == '__main__':
         float(args.num_steps)
     episode_rewards = [0.0]
 
-    state = env.reset()
-    for t in range(args.num_steps):
-        fraction = min(1.0, float(t) / eps_timesteps)
-        eps_threshold = hyper_params['eps-start'] + fraction * \
-            (hyper_params['eps-end'] - hyper_params['eps-start'])
-        sample = random.random()
+    if not args.play:
 
-        if(sample > eps_threshold):
-            # Exploit
+        state = env.reset()
+        for t in range(args.num_steps):
+            fraction = min(1.0, float(t) / eps_timesteps)
+            eps_threshold = hyper_params['eps-start'] + fraction * \
+                (hyper_params['eps-end'] - hyper_params['eps-start'])
+            sample = random.random()
+
+            if(sample > eps_threshold):
+                # Exploit
+                action = agent.act(state)
+            else:
+                # Explore
+                action = env.action_space.sample()
+
+            next_state, reward, done, info = env.step(action)
+            agent.memory.add(state, action, reward, next_state, float(done))
+            state = next_state
+
+            episode_rewards[-1] += reward
+            if done:
+                state = env.reset()
+                episode_rewards.append(0.0)
+
+            if t > hyper_params['learning-starts'] and t % hyper_params['learning-freq'] == 0:
+                agent.optimise_td_loss()
+
+            if t > hyper_params['learning-starts'] and t % hyper_params['target-update-freq'] == 0:
+                agent.update_target_network()
+
+            num_episodes = len(episode_rewards)
+
+            if done and args.print_freq is not None and len(episode_rewards) % args.print_freq == 0:
+                mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
+                print('********************************************************')
+                print('steps: {}'.format(t))
+                print('episodes: {}'.format(num_episodes))
+                print('mean 100 episode reward: {}'.format(mean_100ep_reward))
+                print('% time spent exploring: {}'.format(int(100 * eps_threshold)))
+                print('********************************************************')
+                torch.save(agent.policy_network.state_dict(), os.path.join(args.logdir,'checkpoint.pth'))
+                np.savetxt(os.path.join(args.logdir,'rewards_per_episode.csv'), episode_rewards,
+                           delimiter=',', fmt='%1.3f')
+
+    else:
+        print("Running trained model")
+        state = env.reset()
+        while True:
             action = agent.act(state)
-        else:
-            # Explore
-            action = env.action_space.sample()
-
-        next_state, reward, done, info = env.step(action)
-        agent.memory.add(state, action, reward, next_state, float(done))
-        state = next_state
-
-        episode_rewards[-1] += reward
-        if done:
-            state = env.reset()
-            episode_rewards.append(0.0)
-
-        if t > hyper_params['learning-starts'] and t % hyper_params['learning-freq'] == 0:
-            agent.optimise_td_loss()
-
-        if t > hyper_params['learning-starts'] and t % hyper_params['target-update-freq'] == 0:
-            agent.update_target_network()
-
-        num_episodes = len(episode_rewards)
-
-        if done and args.print_freq is not None and len(episode_rewards) % args.print_freq == 0:
-            mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
-            print('********************************************************')
-            print('steps: {}'.format(t))
-            print('episodes: {}'.format(num_episodes))
-            print('mean 100 episode reward: {}'.format(mean_100ep_reward))
-            print('% time spent exploring: {}'.format(int(100 * eps_threshold)))
-            print('********************************************************')
-            torch.save(agent.policy_network.state_dict(), os.path.join(args.logdir,'checkpoint.pth'))
-            np.savetxt(os.path.join(args.logdir,'rewards_per_episode.csv'), episode_rewards,
-                       delimiter=',', fmt='%1.3f')
+            # action = env.action_space.sample()
+            state, reward, done, info = env.step(action)
+            if(done):
+                state = env.reset()
+            env.render()
