@@ -1,4 +1,3 @@
-# Inspired from https://github.com/raillab/dqn
 import random
 import numpy as np
 import gym
@@ -19,6 +18,8 @@ if __name__ == '__main__':
                         help='The env type')
     parser.add_argument('--dqn-type', type=str, default='nature',
                         help='The model type of dqn')
+    parser.add_argument('--logdir', type=str, default='exp',
+                        help='the dir to store log and model')
     parser.add_argument('--learning-rate', type=float, default=1e-4,
                         help='learning rate')
     parser.add_argument('--num-steps', type=int, default=100000,
@@ -60,6 +61,11 @@ if __name__ == '__main__':
         'eps-fraction': 0.1,  # fraction of num-steps
         # 'print-freq': 10
     }
+
+    # check logdir exists
+    if not os.path.exists(args.logdir):
+        os.makedirs(args.logdir)
+
 
     np.random.seed(hyper_params['seed'])
     random.seed(hyper_params['seed'])
@@ -145,6 +151,6 @@ if __name__ == '__main__':
             print('mean 100 episode reward: {}'.format(mean_100ep_reward))
             print('% time spent exploring: {}'.format(int(100 * eps_threshold)))
             print('********************************************************')
-            torch.save(agent.policy_network.state_dict(), f'checkpoint.pth')
-            np.savetxt('rewards_per_episode.csv', episode_rewards,
+            torch.save(agent.policy_network.state_dict(), os.path.join(args.logdir,'checkpoint.pth'))
+            np.savetxt(os.path.join(args.logdir,'rewards_per_episode.csv'), episode_rewards,
                        delimiter=',', fmt='%1.3f')

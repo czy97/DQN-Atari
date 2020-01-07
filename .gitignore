@@ -6,3 +6,5 @@ video/
 video_history/
 papers/
 results/
+exp/
+.idea/
