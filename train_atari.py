@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='PongNoFrameskip-v4',
                         help='The env type')
     parser.add_argument('--dqn-type', type=str, default='nature',
-                        help='The model type of dqn')
+                        help='The model type of dqn, choose from nature and neurips')
     parser.add_argument('--logdir', type=str, default='exp',
                         help='the dir to store log and model')
     parser.add_argument('--learning-rate', type=float, default=1e-4,
@@ -28,10 +28,9 @@ if __name__ == '__main__':
                         help='number of transitions to optimize at the same time')
     parser.add_argument('--print-freq', type=int, default=10,
                         help='print frequency')
+    parser.add_argument('--double-dqn', action='store_true', default=False, help='whether to use double dqn')
     parser.add_argument('--monitor', action='store_true',default=False)
     parser.add_argument('--play', action='store_true', default=False)
-
-
 
 
 
@@ -45,14 +44,8 @@ if __name__ == '__main__':
 
     hyper_params = {
         'seed': 42,  # which seed to use
-        # 'env': 'PongNoFrameskip-v4',  # name of the game
         'replay-buffer-size': int(5e3),  # replay buffer size
-        # 'learning-rate': 1e-4,  # learning rate for Adam optimizer
         'discount-factor': 0.99,  # discount factor
-        # 'dqn_type':'neurips',
-        # total number of steps to run the environment for
-        # 'num-steps': int(1e6),
-        # 'batch-size': 32,  # number of transitions to optimize at the same time
         'learning-starts': 10000,  # number of steps before learning starts
         'learning-freq': 1,  # number of iterations between every optimization step
         'use-double-dqn': True,  # use double deep Q-learning
@@ -60,7 +53,6 @@ if __name__ == '__main__':
         'eps-start': eps_start,  # e-greedy start threshold
         'eps-end': 0.01,  # e-greedy end threshold
         'eps-fraction': 0.1,  # fraction of num-steps
-        # 'print-freq': 10
     }
 
     # check logdir exists
@@ -84,6 +76,7 @@ if __name__ == '__main__':
     env = ClipRewardEnv(env)
     env = FrameStack(env, 4)
 
+    # use monitor no record the game
     if(args.monitor):
         if not os.path.exists('./video/'):
             os.makedirs('./video/')
@@ -96,7 +89,7 @@ if __name__ == '__main__':
         env.observation_space,
         env.action_space,
         replay_buffer,
-        use_double_dqn=hyper_params['use-double-dqn'],
+        use_double_dqn=args.double_dqn,
         lr=args.learning_rate,
         batch_size=args.batch_size,
         gamma=hyper_params['discount-factor'],
@@ -107,8 +100,7 @@ if __name__ == '__main__':
     if(args.load_checkpoint_file):
         print(f'Loading a policy - { args.load_checkpoint_file } ')
         agent.policy_network.load_state_dict(
-            torch.load(args.load_checkpoint_file))
-
+            torch.load(args.load_checkpoint_file ,map_location=lambda storage, loc: storage))
     eps_timesteps = hyper_params['eps-fraction'] * \
         float(args.num_steps)
     episode_rewards = [0.0]
