@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DQN Atari')
     parser.add_argument('--load-checkpoint-file', type=str, default=None, 
                         help='Where checkpoint file should be loaded from (usually results/checkpoint.pth)')
-    parser.add_argument('--env', type=str, default='PongNoFrameskip-v4',
+    parser.add_argument('--env-name', type=str, default='PongNoFrameskip-v4',
                         help='The env type')
     parser.add_argument('--dqn-type', type=str, default='nature',
                         help='The model type of dqn, choose from nature and neurips')
@@ -28,9 +28,17 @@ if __name__ == '__main__':
                         help='number of transitions to optimize at the same time')
     parser.add_argument('--print-freq', type=int, default=10,
                         help='print frequency')
+    parser.add_argument('--replay-buffer-size', type=int, default=5000,
+                        help='replay buffer size')
+    parser.add_argument('--eps-fraction', type=float, default=0.1,
+                        help='eps-fraction')
     parser.add_argument('--double-dqn', action='store_true', default=False, help='whether to use double dqn')
-    parser.add_argument('--monitor', action='store_true',default=False)
-    parser.add_argument('--play', action='store_true', default=False)
+    parser.add_argument('--monitor', action='store_true',default=False,
+                        help='whether to use monitor to record the game video')
+    parser.add_argument('--play', action='store_true', default=False,
+                        help='test the model, the render the video')
+    parser.add_argument('--test', type=int , default=None,
+                        help='test the model for some episodes, and output the average rewards')
 
 
 
@@ -44,15 +52,12 @@ if __name__ == '__main__':
 
     hyper_params = {
         'seed': 42,  # which seed to use
-        'replay-buffer-size': int(5e3),  # replay buffer size
         'discount-factor': 0.99,  # discount factor
         'learning-starts': 10000,  # number of steps before learning starts
         'learning-freq': 1,  # number of iterations between every optimization step
-        'use-double-dqn': True,  # use double deep Q-learning
         'target-update-freq': 1000,  # number of iterations between every target network update
         'eps-start': eps_start,  # e-greedy start threshold
         'eps-end': 0.01,  # e-greedy end threshold
-        'eps-fraction': 0.1,  # fraction of num-steps
     }
 
     # check logdir exists
@@ -63,8 +68,8 @@ if __name__ == '__main__':
     np.random.seed(hyper_params['seed'])
     random.seed(hyper_params['seed'])
 
-    assert 'NoFrameskip' in args.env, 'Require environment with no frameskip'
-    env = gym.make(args.env)
+    assert 'NoFrameskip' in args.env_name, 'Require environment with no frameskip'
+    env = gym.make(args.env_name)
     env.seed(hyper_params['seed'])
 
     env = NoopResetEnv(env, noop_max=30)
@@ -83,7 +88,7 @@ if __name__ == '__main__':
         env = gym.wrappers.Monitor(
             env, './video/', video_callable=lambda episode_id: episode_id % 50 == 0, force=True)
 
-    replay_buffer = ReplayBuffer(hyper_params['replay-buffer-size'])
+    replay_buffer = ReplayBuffer(args.replay_buffer_size)
 
     agent = DQNAgent(
         env.observation_space,
@@ -101,11 +106,11 @@ if __name__ == '__main__':
         print(f'Loading a policy - { args.load_checkpoint_file } ')
         agent.policy_network.load_state_dict(
             torch.load(args.load_checkpoint_file ,map_location=lambda storage, loc: storage))
-    eps_timesteps = hyper_params['eps-fraction'] * \
+    eps_timesteps = args.eps_fraction * \
         float(args.num_steps)
     episode_rewards = [0.0]
 
-    if not args.play:
+    if not (args.play or args.test is not None):
 
         state = env.reset()
         for t in range(args.num_steps):
@@ -150,7 +155,7 @@ if __name__ == '__main__':
                 np.savetxt(os.path.join(args.logdir,'rewards_per_episode.csv'), episode_rewards,
                            delimiter=',', fmt='%1.3f')
 
-    else:
+    elif args.play:
         print("Running trained model")
         state = env.reset()
         while True:
@@ -160,3 +165,16 @@ if __name__ == '__main__':
             if(done):
                 state = env.reset()
             env.render()
+    else:
+        print('Test the model')
+        reward_sum = 0.0
+        for i in range(args.test):
+            state = env.reset()
+            while True:
+                action = agent.act(state)
+                state, reward, done, info = env.step(action)
+                reward_sum += reward
+                if (done):
+                    break
+
+        print('The average reward is {}'.format(1.0 * reward_sum / args.test))
